@@ -1,4 +1,4 @@
-CREATE TABLE subscriptions (
+CREATE TABLE IF NOT EXISTS subscriptions (
     id UUID PRIMARY KEY,
     service_name TEXT NOT NULL,
     price INTEGER NOT NULL,
@@ -7,5 +7,5 @@ CREATE TABLE subscriptions (
     end_date DATE
 );
 
-CREATE INDEX idx_user_service_dates
+CREATE INDEX IF NOT EXISTS idx_user_service_dates
     ON subscriptions(user_id, service_name, start_date);
