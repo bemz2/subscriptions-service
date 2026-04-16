@@ -23,6 +23,8 @@ func NewSubscriptionRepository(pool *pgxpool.Pool) *SubscriptionRepository {
 }
 
 func (r *SubscriptionRepository) Create(ctx context.Context, s *domain.Subscription) error {
+	const contextKey = "SubscriptionRepository.Create"
+
 	query, args, err := sq.
 		Insert("subscriptions").
 		Columns("id", "service_name", "price", "user_id", "start_date", "end_date").
@@ -30,18 +32,20 @@ func (r *SubscriptionRepository) Create(ctx context.Context, s *domain.Subscript
 		PlaceholderFormat(sq.Dollar).
 		ToSql()
 	if err != nil {
-		return fmt.Errorf("build query: %w", err)
+		return fmt.Errorf("%s: build query: %w", contextKey, err)
 	}
 
 	_, err = r.pool.Exec(ctx, query, args...)
 	if err != nil {
-		return fmt.Errorf("exec: %w", err)
+		return fmt.Errorf("%s: exec: %w", contextKey, err)
 	}
 
 	return nil
 }
 
 func (r *SubscriptionRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Subscription, error) {
+	const contextKey = "SubscriptionRepository.GetByID"
+
 	query, args, err := sq.
 		Select("id", "service_name", "price", "user_id", "start_date", "end_date").
 		From("subscriptions").
@@ -49,7 +53,7 @@ func (r *SubscriptionRepository) GetByID(ctx context.Context, id uuid.UUID) (*do
 		PlaceholderFormat(sq.Dollar).
 		ToSql()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%s: build query: %w", contextKey, err)
 	}
 
 	var s domain.Subscription
@@ -64,16 +68,18 @@ func (r *SubscriptionRepository) GetByID(ctx context.Context, id uuid.UUID) (*do
 	)
 
 	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, ErrSubscriptionNotFound
+		return nil, fmt.Errorf("%s: %w", contextKey, ErrSubscriptionNotFound)
 	}
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%s: query row: %w", contextKey, err)
 	}
 
 	return &s, nil
 }
 
 func (r *SubscriptionRepository) List(ctx context.Context, filter domain.SubscriptionFilter) ([]domain.Subscription, error) {
+	const contextKey = "SubscriptionRepository.List"
+
 	builder := sq.
 		Select("id", "service_name", "price", "user_id", "start_date", "end_date").
 		From("subscriptions").
@@ -94,12 +100,12 @@ func (r *SubscriptionRepository) List(ctx context.Context, filter domain.Subscri
 
 	query, args, err := builder.ToSql()
 	if err != nil {
-		return nil, fmt.Errorf("build query: %w", err)
+		return nil, fmt.Errorf("%s: build query: %w", contextKey, err)
 	}
 
 	rows, err := r.pool.Query(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("query: %w", err)
+		return nil, fmt.Errorf("%s: query: %w", contextKey, err)
 	}
 	defer rows.Close()
 
@@ -115,15 +121,21 @@ func (r *SubscriptionRepository) List(ctx context.Context, filter domain.Subscri
 			&s.StartDate,
 			&s.EndDate,
 		); err != nil {
-			return nil, fmt.Errorf("scan: %w", err)
+			return nil, fmt.Errorf("%s: scan: %w", contextKey, err)
 		}
 		result = append(result, s)
 	}
 
-	return result, rows.Err()
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("%s: rows: %w", contextKey, err)
+	}
+
+	return result, nil
 }
 
 func (r *SubscriptionRepository) Update(ctx context.Context, s *domain.Subscription) error {
+	const contextKey = "SubscriptionRepository.Update"
+
 	query, args, err := sq.
 		Update("subscriptions").
 		Set("service_name", s.ServiceName).
@@ -134,44 +146,48 @@ func (r *SubscriptionRepository) Update(ctx context.Context, s *domain.Subscript
 		PlaceholderFormat(sq.Dollar).
 		ToSql()
 	if err != nil {
-		return fmt.Errorf("build query: %w", err)
+		return fmt.Errorf("%s: build query: %w", contextKey, err)
 	}
 
 	res, err := r.pool.Exec(ctx, query, args...)
 	if err != nil {
-		return fmt.Errorf("exec: %w", err)
+		return fmt.Errorf("%s: exec: %w", contextKey, err)
 	}
 
 	if res.RowsAffected() == 0 {
-		return ErrSubscriptionNotFound
+		return fmt.Errorf("%s: %w", contextKey, ErrSubscriptionNotFound)
 	}
 
 	return nil
 }
 
 func (r *SubscriptionRepository) Delete(ctx context.Context, id uuid.UUID) error {
+	const contextKey = "SubscriptionRepository.Delete"
+
 	query, args, err := sq.
 		Delete("subscriptions").
 		Where(sq.Eq{"id": id}).
 		PlaceholderFormat(sq.Dollar).
 		ToSql()
 	if err != nil {
-		return fmt.Errorf("build query: %w", err)
+		return fmt.Errorf("%s: build query: %w", contextKey, err)
 	}
 
 	res, err := r.pool.Exec(ctx, query, args...)
 	if err != nil {
-		return fmt.Errorf("exec: %w", err)
+		return fmt.Errorf("%s: exec: %w", contextKey, err)
 	}
 
 	if res.RowsAffected() == 0 {
-		return ErrSubscriptionNotFound
+		return fmt.Errorf("%s: %w", contextKey, ErrSubscriptionNotFound)
 	}
 
 	return nil
 }
 
 func (r *SubscriptionRepository) Sum(ctx context.Context, filter domain.SubscriptionFilter) (int, error) {
+	const contextKey = "SubscriptionRepository.Sum"
+
 	builder := sq.
 		Select("COALESCE(SUM(price), 0)").
 		From("subscriptions").
@@ -197,13 +213,13 @@ func (r *SubscriptionRepository) Sum(ctx context.Context, filter domain.Subscrip
 
 	query, args, err := builder.ToSql()
 	if err != nil {
-		return 0, fmt.Errorf("build query: %w", err)
+		return 0, fmt.Errorf("%s: build query: %w", contextKey, err)
 	}
 
 	var total int
 	err = r.pool.QueryRow(ctx, query, args...).Scan(&total)
 	if err != nil {
-		return 0, fmt.Errorf("query: %w", err)
+		return 0, fmt.Errorf("%s: query: %w", contextKey, err)
 	}
 
 	return total, nil
