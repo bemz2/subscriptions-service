@@ -104,7 +104,6 @@ make test-integration
 
 ```bash
 make mocks
-make clean-mocks
 ```
 
 - Генерация: `mockery` по конфигу `api/mockery.yaml`
