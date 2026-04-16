@@ -1,0 +1,245 @@
+basePath: /api/v1
+definitions:
+  dto.CreateSubscriptionRequest:
+    properties:
+      end_date:
+        description: MM-YYYY, optional
+        type: string
+      price:
+        type: integer
+      service_name:
+        type: string
+      start_date:
+        description: MM-YYYY
+        type: string
+      user_id:
+        type: string
+    type: object
+  dto.SubscriptionResponse:
+    properties:
+      end_date:
+        description: MM-YYYY, optional
+        type: string
+      id:
+        type: string
+      price:
+        type: integer
+      service_name:
+        type: string
+      start_date:
+        description: MM-YYYY
+        type: string
+      user_id:
+        type: string
+    type: object
+  dto.SumResponse:
+    properties:
+      total:
+        type: integer
+    type: object
+  dto.UpdateSubscriptionRequest:
+    properties:
+      end_date:
+        description: MM-YYYY, optional
+        type: string
+      price:
+        type: integer
+      service_name:
+        type: string
+      start_date:
+        description: MM-YYYY
+        type: string
+    type: object
+info:
+  contact: {}
+  description: REST API for managing user subscriptions.
+  title: Subscriptions Service API
+  version: "1.0"
+paths:
+  /subscriptions:
+    get:
+      description: Returns a list of subscriptions with optional filters.
+      parameters:
+      - description: Filter by user ID
+        format: uuid
+        in: query
+        name: user_id
+        type: string
+      - description: Filter by service name
+        in: query
+        name: service_name
+        type: string
+      - description: Filter from date (MM-YYYY)
+        in: query
+        name: from
+        type: string
+      - description: Filter to date (MM-YYYY)
+        in: query
+        name: to
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/dto.SubscriptionResponse'
+            type: array
+        "400":
+          description: invalid filter params
+          schema:
+            type: string
+      summary: List subscriptions
+      tags:
+      - subscriptions
+    post:
+      consumes:
+      - application/json
+      description: Creates a new subscription record.
+      parameters:
+      - description: Subscription creation payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateSubscriptionRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.SubscriptionResponse'
+        "400":
+          description: invalid request
+          schema:
+            type: string
+      summary: Create subscription
+      tags:
+      - subscriptions
+  /subscriptions/{id}:
+    delete:
+      description: Deletes a subscription by its UUID.
+      parameters:
+      - description: Subscription ID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: invalid id
+          schema:
+            type: string
+        "404":
+          description: not found
+          schema:
+            type: string
+      summary: Delete subscription
+      tags:
+      - subscriptions
+    get:
+      description: Returns a single subscription by its UUID.
+      parameters:
+      - description: Subscription ID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.SubscriptionResponse'
+        "400":
+          description: invalid id
+          schema:
+            type: string
+        "404":
+          description: not found
+          schema:
+            type: string
+      summary: Get subscription by ID
+      tags:
+      - subscriptions
+    put:
+      consumes:
+      - application/json
+      description: Fully updates an existing subscription by its UUID.
+      parameters:
+      - description: Subscription ID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Subscription update payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateSubscriptionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.SubscriptionResponse'
+        "400":
+          description: invalid request
+          schema:
+            type: string
+        "404":
+          description: not found
+          schema:
+            type: string
+      summary: Update subscription
+      tags:
+      - subscriptions
+  /subscriptions/sum:
+    get:
+      description: Returns the total cost of subscriptions active during the given
+        period, with optional filters.
+      parameters:
+      - description: Filter by user ID
+        format: uuid
+        in: query
+        name: user_id
+        type: string
+      - description: Filter by service name
+        in: query
+        name: service_name
+        type: string
+      - description: Period start (MM-YYYY)
+        in: query
+        name: from
+        type: string
+      - description: Period end (MM-YYYY)
+        in: query
+        name: to
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.SumResponse'
+        "400":
+          description: invalid filter params
+          schema:
+            type: string
+      summary: Calculate total subscription cost
+      tags:
+      - subscriptions
+schemes:
+- http
+swagger: "2.0"
