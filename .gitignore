@@ -1,0 +1,4 @@
+.idea
+mocks
+.env
+docker-compose.yaml
