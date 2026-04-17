@@ -1,6 +1,6 @@
 OPEN           ?= open
 BIN_DIR        := $(CURDIR)/bin
-.PHONY: help setup run test test-integration mocks clean-mocks build swagger migrate docker-up docker-down open-swagger clean
+.PHONY: help setup run test test-integration mocks build swagger migrate docker-up docker-down open-swagger clean
 
 ## help: Show available targets
 help:
@@ -61,7 +61,6 @@ open-swagger:
 
 ## clean: Remove build artifacts
 clean:
-	$(MAKE) clean-mocks
 	rm -rf $(BIN_DIR)
 	rm .env docker-compose.yaml
 	rm -f mocks/*.go

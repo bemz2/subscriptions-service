@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -13,11 +14,20 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-type SubscriptionHandler struct {
-	service *service.SubscriptionService
+type SubscriptionService interface {
+	Create(ctx context.Context, sub *domain.Subscription) (*domain.Subscription, error)
+	GetByID(ctx context.Context, id uuid.UUID) (*domain.Subscription, error)
+	List(ctx context.Context, f domain.SubscriptionFilter) ([]domain.Subscription, error)
+	Update(ctx context.Context, sub *domain.Subscription) (*domain.Subscription, error)
+	Delete(ctx context.Context, id uuid.UUID) error
+	Sum(ctx context.Context, f domain.SubscriptionFilter) (int, error)
 }
 
-func NewSubscriptionHandler(svc *service.SubscriptionService) *SubscriptionHandler {
+type SubscriptionHandler struct {
+	service SubscriptionService
+}
+
+func NewSubscriptionHandler(svc SubscriptionService) *SubscriptionHandler {
 	return &SubscriptionHandler{service: svc}
 }
 
