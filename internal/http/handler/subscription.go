@@ -229,8 +229,8 @@ func (h *SubscriptionHandler) Delete(c echo.Context) error {
 // @Produce json
 // @Param user_id query string false "Filter by user ID" format(uuid)
 // @Param service_name query string false "Filter by service name"
-// @Param from query string false "Period start (MM-YYYY)"
-// @Param to query string false "Period end (MM-YYYY)"
+// @Param from query string true "Period start (MM-YYYY)"
+// @Param to query string true "Period end (MM-YYYY)"
 // @Success 200 {object} dto.SumResponse
 // @Failure 400 {string} string "invalid filter params"
 // @Router /subscriptions/sum [get]
@@ -240,6 +240,12 @@ func (h *SubscriptionHandler) Sum(c echo.Context) error {
 	filter, err := parseFilter(c)
 	if err != nil {
 		return httpError(http.StatusBadRequest, err.Error(), contextKey, err)
+	}
+	if filter.From == nil || filter.To == nil {
+		return httpError(http.StatusBadRequest, "from and to are required", contextKey, errors.New("missing required period bounds"))
+	}
+	if filter.From.After(*filter.To) {
+		return httpError(http.StatusBadRequest, "from must be before or equal to to", contextKey, errors.New("invalid period bounds"))
 	}
 
 	total, err := h.service.Sum(c.Request().Context(), filter)

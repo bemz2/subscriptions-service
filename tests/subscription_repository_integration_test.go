@@ -1,10 +1,12 @@
 package tests
 
 import (
+	"bytes"
 	"context"
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"testing"
 	"time"
 
@@ -111,17 +113,39 @@ func TestSubscriptionRepository_Integration(t *testing.T) {
 			To:     &to,
 		})
 		require.NoError(t, err)
-		require.Equal(t, 300, total)
+		require.Equal(t, 600, total)
 
 		service := "Netflix"
-		total, err = repo.Sum(ctx, domain.SubscriptionFilter{ServiceName: &service})
+		total, err = repo.Sum(ctx, domain.SubscriptionFilter{
+			ServiceName: &service,
+			From:        &from,
+			To:          &to,
+		})
 		require.NoError(t, err)
-		require.Equal(t, 400, total)
+		require.Equal(t, 800, total)
 
 		unknownUser := uuid.MustParse("33333333-3333-3333-3333-333333333333")
-		total, err = repo.Sum(ctx, domain.SubscriptionFilter{UserID: &unknownUser})
+		total, err = repo.Sum(ctx, domain.SubscriptionFilter{
+			UserID: &unknownUser,
+			From:   &from,
+			To:     &to,
+		})
 		require.NoError(t, err)
 		require.Zero(t, total)
+	})
+
+	t.Run("sum period validation", func(t *testing.T) {
+		from := testDate(2025, time.March)
+		to := testDate(2025, time.April)
+
+		_, err := repo.Sum(ctx, domain.SubscriptionFilter{From: &from})
+		require.Error(t, err)
+
+		_, err = repo.Sum(ctx, domain.SubscriptionFilter{To: &to})
+		require.Error(t, err)
+
+		_, err = repo.Sum(ctx, domain.SubscriptionFilter{From: &to, To: &from})
+		require.Error(t, err)
 	})
 
 	t.Run("update", func(t *testing.T) {
@@ -195,11 +219,23 @@ func migrationSQL(t *testing.T) string {
 	_, currentFile, _, ok := runtime.Caller(0)
 	require.True(t, ok)
 
-	sqlPath := filepath.Join(filepath.Dir(currentFile), "..", "migrations", "0001_create_initial_tables.up.sql")
-	sqlBytes, err := os.ReadFile(sqlPath)
+	migrationsDir := filepath.Join(filepath.Dir(currentFile), "..", "migrations")
+	paths, err := filepath.Glob(filepath.Join(migrationsDir, "*.up.sql"))
 	require.NoError(t, err)
+	require.NotEmpty(t, paths)
+	sort.Strings(paths)
 
-	return string(sqlBytes)
+	var merged bytes.Buffer
+	for _, path := range paths {
+		sqlBytes, readErr := os.ReadFile(path)
+		require.NoError(t, readErr)
+		_, writeErr := merged.Write(sqlBytes)
+		require.NoError(t, writeErr)
+		_, writeErr = merged.WriteString("\n")
+		require.NoError(t, writeErr)
+	}
+
+	return merged.String()
 }
 
 func testDate(year int, month time.Month) time.Time {

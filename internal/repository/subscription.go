@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"subscriptions-service/internal/domain"
+	"time"
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/google/uuid"
@@ -187,10 +188,23 @@ func (r *SubscriptionRepository) Delete(ctx context.Context, id uuid.UUID) error
 
 func (r *SubscriptionRepository) Sum(ctx context.Context, filter domain.SubscriptionFilter) (int, error) {
 	const contextKey = "SubscriptionRepository.Sum"
+	if filter.From == nil || filter.To == nil {
+		return 0, fmt.Errorf("%s: from and to are required", contextKey)
+	}
+	if filter.From.After(*filter.To) {
+		return 0, fmt.Errorf("%s: from must be before or equal to to", contextKey)
+	}
 
 	builder := sq.
-		Select("COALESCE(SUM(price), 0)").
+		Select("price", "start_date", "end_date").
 		From("subscriptions").
+		Where(sq.LtOrEq{"start_date": *filter.To}).
+		Where(
+			sq.Or{
+				sq.Eq{"end_date": nil},
+				sq.GtOrEq{"end_date": *filter.From},
+			},
+		).
 		PlaceholderFormat(sq.Dollar)
 
 	if filter.UserID != nil {
@@ -199,28 +213,65 @@ func (r *SubscriptionRepository) Sum(ctx context.Context, filter domain.Subscrip
 	if filter.ServiceName != nil {
 		builder = builder.Where(sq.Eq{"service_name": *filter.ServiceName})
 	}
-	if filter.To != nil {
-		builder = builder.Where(sq.LtOrEq{"start_date": *filter.To})
-	}
-	if filter.From != nil {
-		builder = builder.Where(
-			sq.Or{
-				sq.Eq{"end_date": nil},
-				sq.GtOrEq{"end_date": *filter.From},
-			},
-		)
-	}
 
 	query, args, err := builder.ToSql()
 	if err != nil {
 		return 0, fmt.Errorf("%s: build query: %w", contextKey, err)
 	}
 
-	var total int
-	err = r.pool.QueryRow(ctx, query, args...).Scan(&total)
+	rows, err := r.pool.Query(ctx, query, args...)
 	if err != nil {
 		return 0, fmt.Errorf("%s: query: %w", contextKey, err)
 	}
+	defer rows.Close()
+
+	var total int
+	for rows.Next() {
+		var price int
+		var startDate time.Time
+		var endDate *time.Time
+
+		if err = rows.Scan(&price, &startDate, &endDate); err != nil {
+			return 0, fmt.Errorf("%s: scan: %w", contextKey, err)
+		}
+
+		months := overlapMonths(startDate, endDate, *filter.From, *filter.To)
+		total += price * months
+	}
+
+	if err = rows.Err(); err != nil {
+		return 0, fmt.Errorf("%s: rows: %w", contextKey, err)
+	}
 
 	return total, nil
+}
+
+func overlapMonths(startDate time.Time, endDate *time.Time, from time.Time, to time.Time) int {
+	activeFrom := maxDate(startDate, from)
+	activeTo := to
+	if endDate != nil {
+		activeTo = minDate(*endDate, to)
+	}
+
+	if activeFrom.After(activeTo) {
+		return 0
+	}
+
+	years := activeTo.Year() - activeFrom.Year()
+	months := int(activeTo.Month()) - int(activeFrom.Month())
+	return years*12 + months + 1
+}
+
+func maxDate(a, b time.Time) time.Time {
+	if a.After(b) {
+		return a
+	}
+	return b
+}
+
+func minDate(a, b time.Time) time.Time {
+	if a.Before(b) {
+		return a
+	}
+	return b
 }
