@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"subscriptions-service/internal/domain"
 	"subscriptions-service/internal/lib/logger"
+	"subscriptions-service/internal/repository"
 
 	"github.com/google/uuid"
 )
@@ -49,7 +50,7 @@ func (s *SubscriptionService) GetByID(ctx context.Context, id uuid.UUID) (*domai
 
 	sub, err := s.repo.GetByID(ctx, id)
 	if err != nil {
-		if errors.Is(err, ErrNotFound) {
+		if errors.Is(err, repository.ErrSubscriptionNotFound) || errors.Is(err, ErrNotFound) {
 			return nil, fmt.Errorf("%s: %w", contextKey, ErrNotFound)
 		}
 		s.log.ErrorContext(ctx, "get subscription", "id", id, "error", err)
@@ -75,6 +76,9 @@ func (s *SubscriptionService) Update(ctx context.Context, sub *domain.Subscripti
 	const contextKey = "SubscriptionService.Update"
 
 	if err := s.repo.Update(ctx, sub); err != nil {
+		if errors.Is(err, repository.ErrSubscriptionNotFound) || errors.Is(err, ErrNotFound) {
+			return nil, fmt.Errorf("%s: %w", contextKey, ErrNotFound)
+		}
 		s.log.ErrorContext(ctx, "update subscription", "id", sub.ID, "error", err)
 		return nil, fmt.Errorf("%s: %w", contextKey, err)
 	}
@@ -87,6 +91,9 @@ func (s *SubscriptionService) Delete(ctx context.Context, id uuid.UUID) error {
 	const contextKey = "SubscriptionService.Delete"
 
 	if err := s.repo.Delete(ctx, id); err != nil {
+		if errors.Is(err, repository.ErrSubscriptionNotFound) || errors.Is(err, ErrNotFound) {
+			return fmt.Errorf("%s: %w", contextKey, ErrNotFound)
+		}
 		s.log.ErrorContext(ctx, "delete subscription", "id", id, "error", err)
 		return fmt.Errorf("%s: %w", contextKey, err)
 	}

@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"subscriptions-service/internal/domain"
 	"subscriptions-service/internal/http/dto"
-	"subscriptions-service/internal/repository"
 	"subscriptions-service/internal/service"
 
 	"github.com/google/uuid"
@@ -98,7 +97,7 @@ func (h *SubscriptionHandler) GetByID(c echo.Context) error {
 
 	sub, err := h.service.GetByID(c.Request().Context(), id)
 	if err != nil {
-		if errors.Is(err, repository.ErrSubscriptionNotFound) || errors.Is(err, service.ErrNotFound) {
+		if errors.Is(err, service.ErrNotFound) {
 			return httpError(http.StatusNotFound, "subscription not found", contextKey, err)
 		}
 		return httpError(http.StatusInternalServerError, err.Error(), contextKey, err)
@@ -187,7 +186,7 @@ func (h *SubscriptionHandler) Update(c echo.Context) error {
 
 	updated, err := h.service.Update(c.Request().Context(), sub)
 	if err != nil {
-		if errors.Is(err, repository.ErrSubscriptionNotFound) {
+		if errors.Is(err, service.ErrNotFound) {
 			return httpError(http.StatusNotFound, "subscription not found", contextKey, err)
 		}
 		return httpError(http.StatusInternalServerError, err.Error(), contextKey, err)
@@ -214,7 +213,7 @@ func (h *SubscriptionHandler) Delete(c echo.Context) error {
 	}
 
 	if err := h.service.Delete(c.Request().Context(), id); err != nil {
-		if errors.Is(err, repository.ErrSubscriptionNotFound) {
+		if errors.Is(err, service.ErrNotFound) {
 			return httpError(http.StatusNotFound, "subscription not found", contextKey, err)
 		}
 		return httpError(http.StatusInternalServerError, err.Error(), contextKey, err)
