@@ -32,6 +32,8 @@ Swagger UI: `http://localhost:1323/swagger/index.html`
 - Даты `start_date` и `end_date` передаются в формате `MM-YYYY`.
 - `end_date` — опциональное поле.
 - Агрегация `sum` поддерживает фильтры `user_id`, `service_name`, `from`, `to`.
+- Для `sum` поля `from` и `to` обязательны.
+- Итог `sum` считается как сумма `price * active_months_in_period` по каждой подписке.
 - `id` и `user_id` — UUID.
 
 ## Architecture
@@ -99,6 +101,10 @@ Unit/интеграционные тесты:
 make test
 make test-integration
 ```
+
+Структура тестов:
+- `internal/service` — unit-тесты бизнес-логики.
+- `tests/` — интеграционные тесты репозитория с PostgreSQL (testcontainers).
 
 Моки:
 
