@@ -149,8 +149,25 @@ func TestSubscriptionService_List_Update_Delete_Sum(t *testing.T) {
 	repo.EXPECT().Delete(mock.Anything, sub.ID).Return(nil).Once()
 	require.NoError(t, svc.Delete(ctx, sub.ID))
 
-	repo.EXPECT().Sum(mock.Anything, filter).Return(300, nil).Once()
-	total, err := svc.Sum(ctx, filter)
+	sumSubs := []domain.Subscription{
+		{
+			ID:        uuid.New(),
+			Price:     100,
+			StartDate: time.Date(2025, time.January, 1, 0, 0, 0, 0, time.UTC),
+			EndDate:   nil,
+		},
+		{
+			ID:        uuid.New(),
+			Price:     200,
+			StartDate: time.Date(2025, time.February, 1, 0, 0, 0, 0, time.UTC),
+			EndDate:   nil,
+		},
+	}
+	from := time.Date(2025, time.March, 1, 0, 0, 0, 0, time.UTC)
+	to := time.Date(2025, time.March, 1, 0, 0, 0, 0, time.UTC)
+	sumFilter := domain.SubscriptionFilter{From: &from, To: &to}
+	repo.EXPECT().ListForSum(mock.Anything, sumFilter).Return(sumSubs, nil).Once()
+	total, err := svc.Sum(ctx, sumFilter)
 	require.NoError(t, err)
 	require.Equal(t, 300, total)
 }
@@ -183,11 +200,32 @@ func TestSubscriptionService_ErrorsAreWrapped(t *testing.T) {
 	require.ErrorIs(t, err, baseErr)
 	require.True(t, strings.Contains(err.Error(), "SubscriptionService.Delete"))
 
-	repo.EXPECT().Sum(mock.Anything, filter).Return(0, baseErr).Once()
-	_, err = svc.Sum(ctx, filter)
+	from := time.Date(2025, time.March, 1, 0, 0, 0, 0, time.UTC)
+	to := time.Date(2025, time.April, 1, 0, 0, 0, 0, time.UTC)
+	sumFilter := domain.SubscriptionFilter{From: &from, To: &to}
+	repo.EXPECT().ListForSum(mock.Anything, sumFilter).Return(nil, baseErr).Once()
+	_, err = svc.Sum(ctx, sumFilter)
 	require.Error(t, err)
 	require.ErrorIs(t, err, baseErr)
 	require.True(t, strings.Contains(err.Error(), "SubscriptionService.Sum"))
+}
+
+func TestSubscriptionService_Sum_InvalidPeriod(t *testing.T) {
+	t.Parallel()
+
+	repo := mocks.NewMockSubscriptionRepository(t)
+	svc := NewSubscriptionService(repo, newTestLogger())
+	ctx := context.Background()
+
+	from := time.Date(2025, time.May, 1, 0, 0, 0, 0, time.UTC)
+	to := time.Date(2025, time.April, 1, 0, 0, 0, 0, time.UTC)
+	_, err := svc.Sum(ctx, domain.SubscriptionFilter{From: &from, To: &to})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "from must be before or equal to to")
+
+	_, err = svc.Sum(ctx, domain.SubscriptionFilter{From: &from})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "from and to are required")
 }
 
 func newTestLogger() logger.Logger {

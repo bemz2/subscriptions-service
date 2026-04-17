@@ -7,6 +7,7 @@ import (
 	"subscriptions-service/internal/domain"
 	"subscriptions-service/internal/lib/logger"
 	"subscriptions-service/internal/repository"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -17,9 +18,9 @@ type SubscriptionRepository interface {
 	Create(ctx context.Context, s *domain.Subscription) error
 	GetByID(ctx context.Context, id uuid.UUID) (*domain.Subscription, error)
 	List(ctx context.Context, filter domain.SubscriptionFilter) ([]domain.Subscription, error)
+	ListForSum(ctx context.Context, filter domain.SubscriptionFilter) ([]domain.Subscription, error)
 	Update(ctx context.Context, s *domain.Subscription) error
 	Delete(ctx context.Context, id uuid.UUID) error
-	Sum(ctx context.Context, filter domain.SubscriptionFilter) (int, error)
 }
 
 type SubscriptionService struct {
@@ -104,12 +105,53 @@ func (s *SubscriptionService) Delete(ctx context.Context, id uuid.UUID) error {
 
 func (s *SubscriptionService) Sum(ctx context.Context, filter domain.SubscriptionFilter) (int, error) {
 	const contextKey = "SubscriptionService.Sum"
+	if filter.From == nil || filter.To == nil {
+		return 0, fmt.Errorf("%s: from and to are required", contextKey)
+	}
+	if filter.From.After(*filter.To) {
+		return 0, fmt.Errorf("%s: from must be before or equal to to", contextKey)
+	}
 
-	total, err := s.repo.Sum(ctx, filter)
+	subs, err := s.repo.ListForSum(ctx, filter)
 	if err != nil {
 		s.log.ErrorContext(ctx, "sum subscriptions", "error", err)
 		return 0, fmt.Errorf("%s: %w", contextKey, err)
 	}
 
+	total := 0
+	for _, sub := range subs {
+		total += sub.Price * overlapMonths(sub.StartDate, sub.EndDate, *filter.From, *filter.To)
+	}
+
 	return total, nil
+}
+
+func overlapMonths(startDate time.Time, endDate *time.Time, from time.Time, to time.Time) int {
+	activeFrom := maxDate(startDate, from)
+	activeTo := to
+	if endDate != nil {
+		activeTo = minDate(*endDate, to)
+	}
+
+	if activeFrom.After(activeTo) {
+		return 0
+	}
+
+	years := activeTo.Year() - activeFrom.Year()
+	months := int(activeTo.Month()) - int(activeFrom.Month())
+	return years*12 + months + 1
+}
+
+func maxDate(a, b time.Time) time.Time {
+	if a.After(b) {
+		return a
+	}
+	return b
+}
+
+func minDate(a, b time.Time) time.Time {
+	if a.Before(b) {
+		return a
+	}
+	return b
 }

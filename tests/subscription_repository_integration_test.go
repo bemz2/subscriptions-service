@@ -103,48 +103,48 @@ func TestSubscriptionRepository_Integration(t *testing.T) {
 		require.Empty(t, empty)
 	})
 
-	t.Run("sum filters", func(t *testing.T) {
+	t.Run("list for sum filters", func(t *testing.T) {
 		from := testDate(2025, time.March)
 		to := testDate(2025, time.April)
 
-		total, err := repo.Sum(ctx, domain.SubscriptionFilter{
+		subs, err := repo.ListForSum(ctx, domain.SubscriptionFilter{
 			UserID: &userA,
 			From:   &from,
 			To:     &to,
 		})
 		require.NoError(t, err)
-		require.Equal(t, 600, total)
+		require.Len(t, subs, 2)
 
 		service := "Netflix"
-		total, err = repo.Sum(ctx, domain.SubscriptionFilter{
+		subs, err = repo.ListForSum(ctx, domain.SubscriptionFilter{
 			ServiceName: &service,
 			From:        &from,
 			To:          &to,
 		})
 		require.NoError(t, err)
-		require.Equal(t, 800, total)
+		require.Len(t, subs, 2)
 
 		unknownUser := uuid.MustParse("33333333-3333-3333-3333-333333333333")
-		total, err = repo.Sum(ctx, domain.SubscriptionFilter{
+		subs, err = repo.ListForSum(ctx, domain.SubscriptionFilter{
 			UserID: &unknownUser,
 			From:   &from,
 			To:     &to,
 		})
 		require.NoError(t, err)
-		require.Zero(t, total)
+		require.Empty(t, subs)
 	})
 
-	t.Run("sum period validation", func(t *testing.T) {
+	t.Run("list for sum period validation", func(t *testing.T) {
 		from := testDate(2025, time.March)
 		to := testDate(2025, time.April)
 
-		_, err := repo.Sum(ctx, domain.SubscriptionFilter{From: &from})
+		_, err := repo.ListForSum(ctx, domain.SubscriptionFilter{From: &from})
 		require.Error(t, err)
 
-		_, err = repo.Sum(ctx, domain.SubscriptionFilter{To: &to})
+		_, err = repo.ListForSum(ctx, domain.SubscriptionFilter{To: &to})
 		require.Error(t, err)
 
-		_, err = repo.Sum(ctx, domain.SubscriptionFilter{From: &to, To: &from})
+		_, err = repo.ListForSum(ctx, domain.SubscriptionFilter{From: &to, To: &from})
 		require.Error(t, err)
 	})
 
